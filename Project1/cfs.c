@@ -3,16 +3,76 @@
 FILE* cfs_container;
 cfs_super_block cfs_sb;
 
-int read_block(cfs_block_ptr _block_ptr, int _idx)
+
+int get_empty_block_idx()
 {
-	fseek(cfs_container, _idx * CFS_BLOCK_SIZE, SEEK_SET);	
+	// got to check though meta records
+	// now returns just last empty, no size check
+	return cfs_sb.empty_start_idx;
+
+}
+
+int inc_empty_block_idx()
+{
+	cfs_sb.empty_start_idx += 1;
+	return 0;
+	// if > than size return error?
+}
+
+int inc_num_meta_rec()
+{
+	cfs_sb.num_of_meta_rec += 1;
+	return 0;
+	// if > than size return error?
+}
+
+int get_meta_offset_from_end(int _meta_idx) // 64 (block size) / 8 (meta size) = num of meta in block
+{
+	int res = (_meta_idx + 1) * sizeof(cfs_meta);
+	return res;
+}
+
+
+
+int setpos_to_block_by_idx(int _idx)
+{
+	fseek(cfs_container, _idx * CFS_BLOCK_SIZE, SEEK_SET);
+}
+
+int read_block_by_idx(cfs_block_ptr _block_ptr, int _idx)
+{
+	setpos_to_block_by_idx(_idx); // fseek(cfs_container, _idx * CFS_BLOCK_SIZE, SEEK_SET);
 	fread(_block_ptr, sizeof(cfs_block), 1, cfs_container);
 	return 0;
 }
 
+int read_meta_by_idx(cfs_meta_ptr _meta_ptr, int _idx)
+{
+	fseek(cfs_container, -get_meta_offset_from_end(_idx), SEEK_END);
+	fread(_meta_ptr, sizeof(cfs_meta), 1, cfs_container);
+	return 0;
+}
+
+int find_meta_by_fname(cfs_meta_ptr _meta_ptr, char* _fname)
+{
+	for (int i = 0; i < cfs_sb.num_of_meta_rec; i++)
+	{
+		read_meta_by_idx(_meta_ptr, i);
+		if (strcmp(_meta_ptr->f_path, _fname) == 0)
+		{
+			return 0;
+		}
+	}
+
+	return -1; // not found
+}
+
+
+
+
 int cfs_init(char* _path) 
 {
-	cfs_container = fopen(_path, "rb");
+	cfs_container = fopen(_path, "r+b");
 	if (cfs_container == NULL)
 	{
 		printf("error opening file\n");
@@ -32,12 +92,13 @@ int cfs_init(char* _path)
 	for (int i = 0; i < 4; i++)
 	{
 		printf("\nblock %d\n", i);
-		read_block(block_read_ptr, i);
+		read_block_by_idx(block_read_ptr, i);
 		for (int j = 0; j < CFS_BLOCK_SIZE; j++)
 		{
 			printf("%x ", block_read_ptr->content[j]);
 		}
 	}
+
 
 	return 0;
 };
@@ -95,32 +156,120 @@ int cfs_format(char* _path)
 	return 0;
 }
 
-int get_empty_block_idx()
-{
-	// got to check though meta records
-	// now returns just last empty, no size check
-	return cfs_sb.empty_start_idx;
 
-}
 
-int inc_empty_block_idx()
+
+
+
+int update_size_by_path(char* _path, int _content_size)
 {
-	cfs_sb.empty_start_idx += 1;
+	// check size -> resize -> change start_block_idx
+
+	cfs_meta upd_meta;
+	if (find_meta_by_fname(&upd_meta, _path) == -1)
+	{
+		return -1; // not found by such name
+	}
+
+	if (upd_meta.content_size != _content_size)
+		upd_meta.content_size = _content_size;
+
+
+	int meta_offset_from_end = get_meta_offset_from_end(upd_meta.meta_idx);
+
+
+	fseek(cfs_container, -meta_offset_from_end, SEEK_END);
+
+	fwrite(&upd_meta, sizeof(cfs_meta), 1, cfs_container);
+
 	return 0;
-	// if > than size return error?
 }
 
-int get_meta_offset(int _meta_idx) // 64 (block size) / 8 (meta size) = num of meta in block
+int update_size_by_meta(cfs_meta_ptr upd_meta, int _content_size)
 {
 
+	if (upd_meta->content_size != _content_size)
+		upd_meta->content_size = _content_size;
+
+
+	int meta_offset_from_end = get_meta_offset_from_end(upd_meta->meta_idx);
+
+
+	fseek(cfs_container, -meta_offset_from_end, SEEK_END);
+
+	fwrite(&upd_meta, sizeof(cfs_meta), 1, cfs_container);
+
+	return 0;
 }
 
 
-int add_new_meta()
+
+int add_new_meta(char* _path)
 {
 	cfs_meta new_meta;
-	new_meta.size = 16; // random
+	
+	new_meta.content_size = 0; 
 	new_meta.start_block_idx = get_empty_block_idx();
+
+	strcpy(&(new_meta.f_path), _path);
+
+	inc_empty_block_idx();
+
+	new_meta.meta_idx = cfs_sb.num_of_meta_rec;
+	int meta_offset_from_end = get_meta_offset_from_end(cfs_sb.num_of_meta_rec);
+
+	inc_num_meta_rec();
+
+	fseek(cfs_container, -meta_offset_from_end, SEEK_END);
+	
+	fwrite(&new_meta, sizeof(cfs_meta), 1, cfs_container);
+
 	return 0;
 }
 
+
+
+
+int copy_file_to_cfs(char* _src, char* _dst_at_cfs)
+{
+	FILE* src_fd = fopen(_src, "rb");
+	if (src_fd == NULL)
+	{
+		return -1;
+	}
+
+	fseek(src_fd, 0, SEEK_END);
+	int scr_size = ftell(src_fd);
+	rewind(src_fd);
+
+
+	cfs_meta dts_file_meta; 
+	if (find_meta_by_fname(&dts_file_meta, _dst_at_cfs) == -1)
+		return -1; // err
+	
+	int writable_size = 0;
+	if (dts_file_meta.content_size == 0) writable_size = scr_size;
+	else
+	writable_size = (scr_size > dts_file_meta.content_size) ? dts_file_meta.content_size : scr_size;
+	char ch = 0;
+	
+	setpos_to_block_by_idx(dts_file_meta.start_block_idx);
+	for (int i = 0; i < writable_size; i++)
+	{
+		fread(&ch, sizeof(char), 1, src_fd);
+		fwrite(&ch, sizeof(char), 1, cfs_container);
+		
+	}
+
+	update_size_by_meta(&dts_file_meta, writable_size);
+
+	fclose(src_fd);
+
+	return 0;
+}
+
+int create_file(char* _name)
+{
+	add_new_meta(_name);
+	return 0;
+}

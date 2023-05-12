@@ -2,11 +2,13 @@
 #define _CRT_SECURE_NO_WARNINGS
 #include "stdio.h"
 #include "stdlib.h"
+#include "string.h"
+
 #define CFS_STARTPOS 0xffff // for formating system
 #define CFS_ENDPOS 0x5ffff
-#define CFS_FILE_PATH_LEN 256
+#define CFS_FILE_PATH_LEN 16 // 256
 #define CFS_MAGIC 0x69A4
-#define CFS_BLOCK_SIZE 64
+#define CFS_BLOCK_SIZE 128
 #define CFS_NUMBER_OF_BLOCKS 4
 
 
@@ -27,18 +29,24 @@ typedef struct cfs_super_block_t {
 
 typedef struct cfs_block_t {
     char content[CFS_BLOCK_SIZE];
+
 } cfs_block, * cfs_block_ptr;
 
 typedef struct cfs_meta_t { // now takes 8 bytes
 
-    //char f_path[CFS_FILE_PATH_LEN];
+    char f_path[CFS_FILE_PATH_LEN];
 
-    int start_block_idx; //  4 bytes
-    int size; // 4 bytes
-
+    int start_block_idx; //  
+    int content_size; // in bytes
+    int meta_idx;
     //char is_dir;
     //char cleared;
 
 } cfs_meta, * cfs_meta_ptr;
 
 int add_new_meta();
+
+
+int copy_file_to_cfs(char* _src, char* _dst_at_cfs);
+
+int create_file(char* _name);
