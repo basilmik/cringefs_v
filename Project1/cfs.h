@@ -8,7 +8,8 @@
 #define CFS_ENDPOS 0x5ffff
 #define CFS_FILE_PATH_LEN 16 // 256
 #define CFS_MAGIC 0x69A4
-#define CFS_BLOCK_SIZE 128
+#define CFS_BLOCK_SIZE 64
+#define CRS_DATA_IN_BLOCK_SIZE CFS_BLOCK_SIZE - 4
 #define CFS_NUMBER_OF_BLOCKS 4
 
 
@@ -25,10 +26,12 @@ typedef struct cfs_super_block_t {
     int empty_start_idx;
     int meta_end_idx;
     int num_of_meta_rec;
+    int first_empty_block;
 } cfs_super_block, * cfs_super_block_ptr;
 
 typedef struct cfs_block_t {
-    char content[CFS_BLOCK_SIZE];
+    int next_idx;
+    char content[CFS_BLOCK_SIZE - 4];
 
 } cfs_block, * cfs_block_ptr;
 
