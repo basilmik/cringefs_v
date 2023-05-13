@@ -3,13 +3,6 @@
 FILE* cfs_container;
 cfs_super_block cfs_sb;
 
-int update_sb()
-{
-	
-	fseek(cfs_container, 0, SEEK_SET);
-	fwrite(&cfs_sb, sizeof(cfs_super_block), 1, cfs_container);
-	return 0;
-}
 
 int get_empty_block_idx()
 {
@@ -81,6 +74,37 @@ int find_meta_by_fname(cfs_meta_ptr _meta_ptr, char* _fname)
 	return -1; // not found
 }
 
+
+int get_next_empty()
+{
+	int stat = 0;
+
+	int idx = cfs_sb.first_empty_block + 1;
+	while (1)
+	{
+		stat = get_block_next_idx(idx);
+		if (stat != -1)
+			idx++;
+		else
+		{
+			cfs_sb.first_empty_block = idx;
+			break;
+		}
+	}
+
+	return cfs_sb.first_empty_block;
+}
+
+int get_block_next_idx(int _cur_idx)
+{
+	int cur_pos = ftell(cfs_container);
+	setpos_to_block_by_idx(_cur_idx);
+	int read_next_value = 0;
+	fread(&read_next_value, sizeof(int), 1, cfs_container);
+	fseek(cfs_container, cur_pos, SEEK_SET);
+
+	return read_next_value;
+}
 
 
 
@@ -177,6 +201,13 @@ int cfs_format(char* _path)
 
 
 
+int update_sb()
+{
+
+	fseek(cfs_container, 0, SEEK_SET);
+	fwrite(&cfs_sb, sizeof(cfs_super_block), 1, cfs_container);
+	return 0;
+}
 
 
 int update_size_by_path(char* _path, int _content_size)
@@ -223,25 +254,7 @@ int update_first_empty_idx()
 	cfs_sb.first_empty_block = get_next_empty();
 }
 
-int get_next_empty()
-{
-	int stat = 0;
 
-	int idx = cfs_sb.first_empty_block + 1;
-	while (1)
-	{
-		stat = get_block_next_idx(idx);
-		if (stat != -1)
-			idx++;
-		else
-		{
-			cfs_sb.first_empty_block = idx;
-			break;
-		}
-	}
-
-	return cfs_sb.first_empty_block;
-}
 
 int add_new_meta(char* _path)
 {
@@ -267,122 +280,11 @@ int add_new_meta(char* _path)
 	return 0;
 }
 
-
-int check_if_fits(cfs_meta_ptr _file_meta, int _new_size)
-{
-	return (_new_size <= _file_meta->content_size);
-}
-
-int get_num_meta_blocks()
-{
-	return cfs_sb.meta_end_idx;
-}
-
-int get_blocks_to_meta_space_in_bytes()
-{
-	int space = get_num_meta_blocks() - get_empty_block_idx();
-	return space * CFS_BLOCK_SIZE;
-}
-
-int get_space_btw_block(int _idx1, int _idx2)
-{
-	cfs_meta fm1;
-	cfs_meta fm2;
-	read_meta_by_idx(&fm1, _idx1);
-	read_meta_by_idx(&fm2, _idx2);
-
-}
-
-int check_extension(cfs_meta_ptr _file_meta, int _new_size)
-{
-	if (_file_meta->meta_idx == cfs_sb.num_of_meta_rec) // if this record is last
-	{
-		if (get_blocks_to_meta_space_in_bytes() >= _new_size)
-			return 1; // extend here
-		else
-			return -1; // cannot fit!
-	}
-	else
-	{
-		cfs_meta next_file_meta;
-		read_meta_by_idx(&next_file_meta, _file_meta->meta_idx); // deleted files not counted
-		int space = next_file_meta.start_block_idx - _file_meta->meta_idx;
-		space *= CFS_BLOCK_SIZE; // in bytes
-		if (space >= _new_size)
-		{
-			return 1;
-		}
-	}
-}
-
-
-int copy_file_to_cfs(char* _src, char* _dst_at_cfs)
-{
-	cfs_meta dts_file_meta;
-	if (find_meta_by_fname(&dts_file_meta, _dst_at_cfs) == -1) // no such destination
-		return -1; // err
-
-
-	FILE* src_fd = fopen(_src, "rb");
-	if (src_fd == NULL)
-	{
-		return -1;
-	}
-
-	fseek(src_fd, 0, SEEK_END);
-	int scr_size = ftell(src_fd);
-	rewind(src_fd);
-	int writable_size = 0;
-
-	if (check_if_fits(&dts_file_meta, scr_size))
-	{
-		writable_size = scr_size;
-	}
-	else
-	{
-
-	}
-
-	if (dts_file_meta.content_size == 0) 
-		writable_size = scr_size;
-	else
-		writable_size = (scr_size > dts_file_meta.content_size) ? dts_file_meta.content_size : scr_size;
-	char ch = 0;
-	
-	setpos_to_block_by_idx(dts_file_meta.start_block_idx);
-	for (int i = 0; i < writable_size; i++)
-	{
-		fread(&ch, sizeof(char), 1, src_fd);
-
-		fwrite(&ch, sizeof(char), 1, cfs_container);
-		
-	}
-
-	update_size_by_meta(&dts_file_meta, writable_size);
-
-	fclose(src_fd);
-
-	return 0;
-}
-
 int create_file(char* _name)
 {
 	add_new_meta(_name);
 	return 0;
 }
-
-int get_block_next_idx(int _cur_idx)
-{
-	int cur_pos = ftell(cfs_container);
-	setpos_to_block_by_idx(_cur_idx);
-	int read_next_value = 0;
-	fread(&read_next_value, sizeof(int), 1, cfs_container);
-	fseek(cfs_container, cur_pos, SEEK_SET);
-	return read_next_value;
-
-}
-
-
 
 
 int write_file(char* _src, char* _dst_at_cfs)
@@ -414,105 +316,67 @@ int write_file(char* _src, char* _dst_at_cfs)
 	}
 
 	int read_now_size = 0;
-	//if (scr_size < dst_file_meta.content_size) 
+
+	
+	char* buf;
+	while (writable_size > 0)
 	{
-		char* buf;
-		while (writable_size > 0)
+		read_now_size = (writable_size >= CRS_DATA_IN_BLOCK_SIZE) ? CRS_DATA_IN_BLOCK_SIZE : writable_size;
+		printf("read_now_size %d\n", read_now_size);
+
+		buf = calloc(read_now_size, sizeof(char));
+		if (buf == NULL)
 		{
-			read_now_size = (writable_size >= CRS_DATA_IN_BLOCK_SIZE) ? CRS_DATA_IN_BLOCK_SIZE : writable_size;
-			printf("read_now_size %d\n", read_now_size);
+			exit(-1); // err
+		}
 
-			buf = calloc(read_now_size, sizeof(char));
-			if (buf == NULL)
+		if (scr_size >= dst_file_meta.content_size) // files becomes bigger
+			if (next_block_idx <= 0)
 			{
-				exit(-1); // err
+				next_block_idx = get_next_empty();
+					
 			}
 
-			if (scr_size >= dst_file_meta.content_size) // files becomes bigger
-				if (next_block_idx <= 0)
-				{
-					next_block_idx = get_next_empty();
-					//update_first_empty_idx();
-				}
+		setpos_to_block_by_idx(cur_block_idx);
+			
+		fread(buf, sizeof(char), read_now_size, src_fd);
+			
+		writable_size -= read_now_size;
 
+		if (writable_size == 0) // this block is the last				
+		{
+			fwrite(&writable_size, sizeof(int), 1, cfs_container); // next idx = 0 -> sb meaning this one is last			
+		}
+		else // this block is not last						
+		{
+			fwrite(&next_block_idx, sizeof(int), 1, cfs_container);
+		}
+
+		fwrite(buf, sizeof(char), read_now_size, cfs_container);
+
+		cur_block_idx = next_block_idx;
+		next_block_idx = get_block_next_idx(cur_block_idx);			
+	}
+
+	if (scr_size < dst_file_meta.content_size) // files becomes smaller
+	{
+		int consta = -1;
+		while (cur_block_idx != 0) //  set not used as empty (next_idx = -1)
+		{
 			setpos_to_block_by_idx(cur_block_idx);
-			
-			fread(buf, sizeof(char), read_now_size, src_fd);
-			
-			writable_size -= read_now_size;
-
-			if (writable_size == 0) // this block is the last				
-			{
-				fwrite(&writable_size, sizeof(int), 1, cfs_container); // next idx = 0 -> sb meaning this one is last			
-			}
-			else // this block is not last						
-			{
-				fwrite(&next_block_idx, sizeof(int), 1, cfs_container);
-			}
-
-			fwrite(buf, sizeof(char), read_now_size, cfs_container);
-
+			fwrite(&consta, sizeof(int), 1, cfs_container);
 			cur_block_idx = next_block_idx;
 			next_block_idx = get_block_next_idx(cur_block_idx);
-			
-		}
-
-		if (scr_size < dst_file_meta.content_size) // files becomes smaller
-		{
-			int consta = -1;
-			while (cur_block_idx != 0) //  set not used as empty (next_idx = -1)
-			{
-				setpos_to_block_by_idx(cur_block_idx);
-				fwrite(&consta, sizeof(int), 1, cfs_container);
-				cur_block_idx = next_block_idx;
-				next_block_idx = get_block_next_idx(cur_block_idx);
-			}
 		}
 	}
-	//else //  files becomes bigger
-	//{
-	//	char* buf;
-	//	while (writable_size > 0)
-	//	{
-	//		read_now_size = (writable_size >= CRS_DATA_IN_BLOCK_SIZE) ? CRS_DATA_IN_BLOCK_SIZE : writable_size;
-	//		printf("read_now_size %d\n", read_now_size);
-
-	//		buf = calloc(read_now_size, sizeof(char));
-	//		if (buf == NULL)
-	//		{
-	//			exit(-1); // err
-	//		}
-	//		if (next_block_idx <= 0)
-	//		{
-	//			next_block_idx = get_next_empty();
-	//		}
-	//		setpos_to_block_by_idx(cur_block_idx);
-
-	//		fread(buf, sizeof(char), read_now_size, src_fd);
-	//		writable_size -= read_now_size;
-
-	//		if (writable_size == 0) // this block is the last				
-	//		{
-	//			fwrite(&writable_size, sizeof(int), 1, cfs_container); // next idx = 0 -> sb meaning this one is last			
-	//		}
-	//		else // this block is not last						
-	//		{
-	//			fwrite(&next_block_idx, sizeof(int), 1, cfs_container);
-	//		}
-
-	//		fwrite(buf, sizeof(char), read_now_size, cfs_container);
-
-
-	//		cur_block_idx = next_block_idx;
-	//		next_block_idx = get_block_next_idx(cur_block_idx);
-	//	}
-	//}
-
+	
 
 	update_size_by_meta(&dst_file_meta, scr_size);
 	update_meta_end_idx();
 	update_sb();
 
 	fclose(src_fd);
-
+	return 0;
 }
+
+// EOF
