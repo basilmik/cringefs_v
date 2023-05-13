@@ -31,8 +31,6 @@ int main()
 	create_file("f4");
 	write_file("test6.txt", "f4");
 
-	write_file("test4.txt", "f1");
-	cfs_shutdown();
 
 #endif
 	/*getch();

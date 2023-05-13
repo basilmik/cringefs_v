@@ -421,9 +421,8 @@ int write_file(char* _src, char* _dst_at_cfs)
 			return -1;
 		}
 
-
 		read_now_size = (writable_size >= CRS_DATA_IN_BLOCK_SIZE) ? CRS_DATA_IN_BLOCK_SIZE : writable_size;
-		printf("read_now_size %d\n", read_now_size);
+		//printf("read_now_size %d\n", read_now_size);
 
 		buf = calloc(read_now_size, sizeof(char));
 		if (buf == NULL)
@@ -515,23 +514,15 @@ int read_file(char* _dst, char* _src_at_cfs)
 		fread(buf, sizeof(char), read_now_size, cfs_container);
 		buf[read_now_size] = NULL;
 
-		//read_block_by_idx(&block_read, start_idx);
+		//printf("%s", buf);
+
+		fwrite(buf, sizeof(char), read_now_size, dst_fd);
 		
-		//strcpy(buf, &block_read.content);
-
-		/*if (read_now_size != CRS_DATA_IN_BLOCK_SIZE)
-			block_read.content[read_now_size] = NULL;*/
-
-		printf("%s", buf);
-		fprintf(dst_fd, "%s", buf);
-		//fwrite(&(block_read.content), sizeof(char), read_now_size - 1, dst_fd);
-		
-
 		start_idx = get_block_next_idx(start_idx);
 		free(buf);
 	}
 
-	printf("\n");
+	//printf("\n");
 
 	fclose(dst_fd);
 	return 0;
