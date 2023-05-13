@@ -29,22 +29,25 @@ typedef struct cfs_super_block_t {
 
 typedef struct cfs_block_t {
    
-    int next_idx;
+    int next_idx; // if clean = -1
     unsigned char content[CRS_DATA_IN_BLOCK_SIZE];
 
 } cfs_block, * cfs_block_ptr;
 
 typedef struct cfs_meta_t { // 28
 
+    int start_block_idx;
     unsigned char f_path[CFS_FILE_PATH_LEN];
-
-    int start_block_idx; // if clean = -1
+    
+    
     int content_size; // in bytes
     int meta_idx;
-    int fitt;
+    int is_deleted;
 
 } cfs_meta, * cfs_meta_ptr;
 
 
 int create_file(char* _name);
-int read_file(char* _dst, char* _src_at_cfs);
+int export_file(char* _dst, char* _src_at_cfs);
+int delete_file(char* _dst_at_cfs, int _set_deleted);
+void cfs_pack();

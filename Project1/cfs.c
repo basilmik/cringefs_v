@@ -247,6 +247,14 @@ int update_size_by_path(char* _path, int _content_size)
 	return 0;
 }
 
+int update_meta_at_idx(cfs_meta_ptr upd_meta_ptr, int _idx)
+{
+	int meta_offset_from_end = get_meta_offset_from_end(_idx);
+	fseek(cfs_container, -meta_offset_from_end, SEEK_END);
+
+	fwrite(upd_meta_ptr, sizeof(cfs_meta), 1, cfs_container);
+}
+
 int update_size_by_meta(cfs_meta_ptr upd_meta_ptr, int _content_size)
 {
 	if (upd_meta_ptr->content_size != _content_size)
@@ -266,16 +274,14 @@ int update_first_empty_idx()
 }
 
 
-
 int add_new_meta(char* _path)
 {
 	cfs_meta new_meta = { 0 };
 
 	new_meta.content_size = 0;
 	new_meta.start_block_idx = get_empty_block_idx();
-	//update_first_empty_idx();
-	strcpy(&(new_meta.f_path), _path);
 
+	strcpy(&(new_meta.f_path), _path);
 
 	new_meta.meta_idx = cfs_sb.num_of_meta_rec;
 	int meta_offset_from_end = get_meta_offset_from_end(cfs_sb.num_of_meta_rec);
@@ -320,10 +326,10 @@ int delete_block_list(int _start_idx)
 {
 	int consta = -1;
 	int next_block_idx = get_block_next_idx(_start_idx);
-
-	
-		set_empty_block_idx(_start_idx);
-
+	if (next_block_idx == -1)
+		return 0;
+	if (get_first_empty() == -1)
+		set_empty_block_idx( 1);
 	while (_start_idx != 0) //  set not used as empty (next_idx = -1)
 	{
 		if (_start_idx != -1 && get_first_empty() > _start_idx)
@@ -334,6 +340,7 @@ int delete_block_list(int _start_idx)
 		_start_idx = next_block_idx;
 		next_block_idx = get_block_next_idx(_start_idx);
 	}
+	return 0;
 }
 
 void write_block_next_idx(int* _next_idx, int _block_idx)
@@ -347,7 +354,7 @@ int write_block(int* _next_idx, char* _buf, int _buf_size, int _block_idx)
 	setpos_to_block_by_idx(_block_idx);
 	write_block_next_idx(_next_idx, _block_idx);
 	fwrite(_buf, sizeof(char), _buf_size, cfs_container);
-	getch();
+	//getch();
 	return 0;
 }
 
@@ -361,9 +368,9 @@ int get_file_size(FILE* _fp)
 
 
 
-int write_file(char* _src, char* _dst_at_cfs)
+int import_file(char* _src, char* _dst_at_cfs)
 {
-	if (delete_file(_dst_at_cfs) == -1)
+	if (delete_file(_dst_at_cfs, 0) == -1)
 		return -1; //  error
 
 	cfs_meta dst_file_meta;
@@ -372,12 +379,6 @@ int write_file(char* _src, char* _dst_at_cfs)
 		return -1; // err
 	}
 	
-	/*if (get_first_empty() == -1)
-	{
-		printf("no space left! exiting\n");
-		return -1;
-	}*/
-
 
 	FILE* src_fd = fopen(_src, "rb");
 	if (src_fd == NULL)
@@ -465,26 +466,54 @@ int write_file(char* _src, char* _dst_at_cfs)
 	return 0;
 }
 
-int delete_file(char* _dst_at_cfs)
+int delete_file2(char* _dst_at_cfs, int _set_deleted)
 {
 	cfs_meta dst_file_meta;
 	if (find_meta_by_fname(&dst_file_meta, _dst_at_cfs) == -1) // no such destination
 	{
 		return -1; // err
 	}
-	if (dst_file_meta.content_size > 0)
-	delete_block_list(dst_file_meta.start_block_idx);
+
+	if (!dst_file_meta.is_deleted)
+		if (dst_file_meta.content_size > 0)
+			delete_block_list(dst_file_meta.start_block_idx);
+	
+	dst_file_meta.is_deleted = _set_deleted;	
+	dst_file_meta.start_block_idx = 1;
+	update_meta_at_idx(&dst_file_meta, dst_file_meta.meta_idx);
 	return 0;
 }
 
-int read_file(char* _dst, char* _src_at_cfs)
+int delete_file(char* _dst_at_cfs, int _set_deleted)
+{
+	cfs_meta dst_file_meta;
+	if (find_meta_by_fname(&dst_file_meta, _dst_at_cfs) == -1) // no such destination
+	{
+		return -1; // err
+	}
+
+	if (dst_file_meta.content_size > 0)
+		delete_block_list(dst_file_meta.start_block_idx);
+
+
+	dst_file_meta.is_deleted = _set_deleted;
+	//dst_file_meta.start_block_idx = 1;
+	update_meta_at_idx(&dst_file_meta, dst_file_meta.meta_idx);
+
+	return 0;
+}
+
+int export_file(char* _dst, char* _src_at_cfs)
 {
 	cfs_meta src_file_meta;
 	if (find_meta_by_fname(&src_file_meta, _src_at_cfs) == -1) // no such destination
 	{
 		return -1; // err
 	}
-
+	if (src_file_meta.is_deleted)
+	{
+		return -1; // deleted
+	}
 
 	FILE* dst_fd = fopen(_dst, "w+b");
 	if (dst_fd == NULL)
@@ -527,5 +556,91 @@ int read_file(char* _dst, char* _src_at_cfs)
 	fclose(dst_fd);
 	return 0;
 }
+
+
+void cfs_pack()
+{
+	char* tmp_name;
+
+	for (int i = 0; i < cfs_sb.num_of_meta_rec; i++)
+	{
+		cfs_meta src_file_meta = { 0 };
+		if (read_meta_by_idx(&src_file_meta, i) == -1) // no such 
+		{
+			continue;
+		}
+		if (src_file_meta.is_deleted)
+		{
+			continue;
+		}
+		tmp_name = calloc(strlen(src_file_meta.f_path) + 4 + 1, sizeof(char));
+		if (tmp_name == NULL)
+		{
+			return -1; //  err
+		}
+		strcpy(tmp_name, src_file_meta.f_path);
+		strcat(tmp_name, (char*)".tmp");
+
+		export_file(tmp_name, src_file_meta.f_path);
+		delete_file(src_file_meta.f_path, 0);
+		free(tmp_name);
+		update_sb();
+	}
+
+	
+	int valid_count = 0;
+	for (int i = 0; i < cfs_sb.num_of_meta_rec; i++)
+	{
+		cfs_meta src_file_meta = { 0 };
+		if (read_meta_by_idx(&src_file_meta, i) == -1) // no such 
+		{
+			continue;
+		}
+		if (src_file_meta.is_deleted)
+		{
+			continue;
+		}
+
+
+		tmp_name = calloc(strlen(src_file_meta.f_path) + 4 + 1, sizeof(char));
+		if (tmp_name == NULL)
+		{
+			return -1; //  err
+		}
+		strcpy(tmp_name, src_file_meta.f_path);
+		strcat(tmp_name, (char*)".tmp");
+
+		//src_file_meta.is_deleted = 0;
+		src_file_meta.start_block_idx = get_first_empty();
+		update_meta_at_idx(&src_file_meta, i);
+
+		import_file(tmp_name, src_file_meta.f_path);
+		
+		src_file_meta.meta_idx = valid_count;
+		update_meta_at_idx(&src_file_meta, valid_count);
+		valid_count++;
+		free(tmp_name);
+		
+	}
+	cfs_meta upd_meta = { -1, 0 };
+	cfs_meta upd_meta_zero = { 0 };
+	for (int i = valid_count; i < cfs_sb.num_of_meta_rec; i++)
+	{
+		update_meta_at_idx(&upd_meta_zero, i);
+		int relation = CFS_BLOCK_SIZE / sizeof(cfs_meta);
+		if ((i-1) % (relation) == 0)
+		{
+			update_meta_at_idx(&upd_meta, i);
+		}
+	}
+
+	cfs_sb.num_of_meta_rec = valid_count;
+	update_meta_end_idx();
+	update_sb();
+	
+	
+	return 0;
+}
+
 
 // EOF
