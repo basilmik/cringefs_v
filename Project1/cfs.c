@@ -105,6 +105,7 @@ int get_block_next_idx(int _cur_idx)
 {
 	if (_cur_idx == -1)
 		return _cur_idx;
+
 	int cur_pos = ftell(cfs_container);
 	setpos_to_block_by_idx(_cur_idx);
 	int read_next_value = 0;
@@ -292,6 +293,11 @@ int create_file(char* _name)
 		return -1;
 	}
 
+	if (get_block_next_idx(CFS_NUMBER_OF_BLOCKS - cfs_sb.meta_end_idx - 1) != -1)
+	{
+		printf("cannot create new meta! exiting\n");
+		return -1;
+	}
 
 	add_new_meta(_name);
 	return 0;
@@ -308,10 +314,15 @@ int delete_block_list(int _start_idx)
 {
 	int consta = -1;
 	int next_block_idx = get_block_next_idx(_start_idx);
-	set_empty_block_idx(_start_idx);
+
+	
+		set_empty_block_idx(_start_idx);
 
 	while (_start_idx != 0) //  set not used as empty (next_idx = -1)
 	{
+		if (_start_idx != -1 && get_first_empty() > _start_idx)
+			set_empty_block_idx(_start_idx);
+
 		setpos_to_block_by_idx(_start_idx);
 		fwrite(&consta, sizeof(int), 1, cfs_container);
 		_start_idx = next_block_idx;
@@ -345,17 +356,20 @@ int get_file_size(FILE* _fp)
 
 int write_file(char* _src, char* _dst_at_cfs)
 {
+	if (delete_file(_dst_at_cfs) == -1)
+		return -1; //  error
+
 	cfs_meta dst_file_meta;
 	if (find_meta_by_fname(&dst_file_meta, _dst_at_cfs) == -1) // no such destination
 	{
 		return -1; // err
 	}
 	
-	if (get_first_empty() == -1)
+	/*if (get_first_empty() == -1)
 	{
 		printf("no space left! exiting\n");
 		return -1;
-	}
+	}*/
 
 
 	FILE* src_fd = fopen(_src, "rb");
@@ -369,7 +383,11 @@ int write_file(char* _src, char* _dst_at_cfs)
 	int writable_size = scr_size;
 	int wrote_size = 0;
 	int cur_block_idx = dst_file_meta.start_block_idx;
-	int next_block_idx = get_block_next_idx(cur_block_idx);
+	//int next_block_idx = get_block_next_idx(cur_block_idx);
+
+	int next_block_idx = 0;
+	//update_first_empty_idx();
+
 	int last_block_idx = cur_block_idx;
 
 	int num_of_blocks_needed = scr_size / (CRS_DATA_IN_BLOCK_SIZE);
@@ -383,15 +401,19 @@ int write_file(char* _src, char* _dst_at_cfs)
 	int read_now_size = 0;
 	
 	char* buf;
+
+
 	while (writable_size > 0)
 	{
+		
+		next_block_idx = get_next_empty();
+		//update_first_empty_idx();
 		if (cur_block_idx >= CFS_NUMBER_OF_BLOCKS - cfs_sb.meta_end_idx)
 		{
 			printf("error writng, cant fit\n");
 			system("pause");
 			return -1;
 		}
-
 
 
 		read_now_size = (writable_size >= CRS_DATA_IN_BLOCK_SIZE) ? CRS_DATA_IN_BLOCK_SIZE : writable_size;
@@ -402,32 +424,40 @@ int write_file(char* _src, char* _dst_at_cfs)
 		{
 			exit(-1); // err
 		}
-
-		if (scr_size >= dst_file_meta.content_size) // files becomes bigger
-		{
-			if (next_block_idx == -1)
-			{
-				next_block_idx = get_next_empty();
-			}
-			if (next_block_idx == 0)
-			{
-				next_block_idx = get_first_empty();
-				update_first_empty_idx();
-			}
-		}
+		
+		//if (scr_size >= dst_file_meta.content_size) // files becomes bigger
+		//{
+		//	if (next_block_idx == -1)
+		//	{
+		//		next_block_idx = get_next_empty();
+		//	}
+		//	if (next_block_idx == 0)
+		//	{
+		//		next_block_idx = get_first_empty();
+		//		update_first_empty_idx();
+		//	}
+		//}
 
 		fread(buf, sizeof(char), read_now_size, src_fd);
 		writable_size -= read_now_size;
 		wrote_size += read_now_size;
+
 		write_block((writable_size == 0 ? &writable_size : &next_block_idx), buf, read_now_size, cur_block_idx);
-			
+		
 		last_block_idx = cur_block_idx;
-		cur_block_idx = next_block_idx;
-		next_block_idx = get_block_next_idx(cur_block_idx);
+		cur_block_idx = get_first_empty();
+		
+		/*update_first_empty_idx();
+		next_block_idx = get_first_empty();*/
+		
+		//next_block_idx = get_block_next_idx(cur_block_idx);
+		
+		
+
 
 		if (cur_block_idx == -1 && scr_size != wrote_size)
 		{
-			printf("no scape left\n");
+			printf("no space left\n");
 			int zero = 0;
 			write_block_next_idx(&zero, last_block_idx);
 			update_first_empty_idx();
@@ -451,6 +481,18 @@ int write_file(char* _src, char* _dst_at_cfs)
 	update_sb();
 
 	fclose(src_fd);
+	return 0;
+}
+
+int delete_file(char* _dst_at_cfs)
+{
+	cfs_meta dst_file_meta;
+	if (find_meta_by_fname(&dst_file_meta, _dst_at_cfs) == -1) // no such destination
+	{
+		return -1; // err
+	}
+	if (dst_file_meta.content_size > 0)
+	delete_block_list(dst_file_meta.start_block_idx);
 	return 0;
 }
 

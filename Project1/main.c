@@ -1,7 +1,6 @@
 #include "stdio.h"
 #include "cfs.h"
 #define REFORMAT 0
-
 int main()
 {
 
@@ -9,13 +8,26 @@ int main()
 	
 #if REFORMAT
 	cfs_init("container.txt");
-	cfs_shutdown();
 	getch();
+	write_file("test.txt", "f2");
+	/*getch();
+	create_file("f5");*/
+	getch();
+	write_file("test7.txt", "f1");
+
+	getch();
+	write_file("test.txt", "f1");
+
+	getch();
+	write_file("test7.txt", "f1");
+	getch();
+	cfs_shutdown();
 #else
 	cfs_format("container.txt");
 
 
 	cfs_init("container.txt");
+
 	create_file("f1");
 	write_file("test.txt", "f1");
 	cfs_shutdown();
