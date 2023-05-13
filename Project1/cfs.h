@@ -47,3 +47,4 @@ typedef struct cfs_meta_t { // 28
 
 
 int create_file(char* _name);
+int read_file(char* _dst, char* _src_at_cfs);

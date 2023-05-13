@@ -3,58 +3,38 @@
 #define REFORMAT 1
 int main()
 {
-
-	printf("%d\n", sizeof(cfs_meta));
+#if REFORMAT 
 	
-#if REFORMAT
 	cfs_init("container.txt");
-	getch();
-	write_file("test.txt", "f2");
-	/*getch();
-	create_file("f5");*/
-	getch();
-	write_file("test7.txt", "f1");
-
-	getch();
-	write_file("test.txt", "f1");
-
-	getch();
-	write_file("test7.txt", "f1");
-	getch();
+	read_file("f1.txt", "f1");
+	read_file("f2.txt", "f2");
+	read_file("f3.txt", "f3");
+	read_file("f4.txt", "f4");
 	cfs_shutdown();
+
 #else
 	cfs_format("container.txt");
-
 
 	cfs_init("container.txt");
 
 	create_file("f1");
 	write_file("test.txt", "f1");
-	cfs_shutdown();
-	getch();
 
-	cfs_init("container.txt");
 	create_file("f2");	
 	write_file("test2.txt", "f2");
-	cfs_shutdown();
 
-	getch();	
-	cfs_init("container.txt");
 	create_file("f3");
 	write_file("test3.txt", "f3");
-	cfs_shutdown();
 
-	getch();
-	cfs_init("container.txt");
-	write_file("test4.txt", "f1");
-	cfs_shutdown();
-	
-	getch();
-	cfs_init("container.txt");
+
+
 	create_file("f4");
 	write_file("test6.txt", "f4");
+
+	write_file("test4.txt", "f1");
 	cfs_shutdown();
 
+#endif
 	/*getch();
 	cfs_init("container.txt");
 	write_file("test5.txt", "f2");
@@ -67,9 +47,6 @@ int main()
 	//getch();
 	//getch();
 
-
-
-#endif
 
 	return 0;
 }

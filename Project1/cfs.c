@@ -342,6 +342,7 @@ int write_block(int* _next_idx, char* _buf, int _buf_size, int _block_idx)
 	setpos_to_block_by_idx(_block_idx);
 	write_block_next_idx(_next_idx, _block_idx);
 	fwrite(_buf, sizeof(char), _buf_size, cfs_container);
+	getch();
 	return 0;
 }
 
@@ -384,7 +385,7 @@ int write_file(char* _src, char* _dst_at_cfs)
 	int writable_size = scr_size;
 	int wrote_size = 0;
 	int cur_block_idx = dst_file_meta.start_block_idx;
-	
+	set_empty_block_idx(cur_block_idx);
 	int next_block_idx = 0;
 	
 
@@ -403,11 +404,11 @@ int write_file(char* _src, char* _dst_at_cfs)
 	char* buf;
 
 	next_block_idx = get_next_empty();
-	//update_first_empty_idx();
+
 	while (writable_size > 0)
 	{	
 		update_first_empty_idx();
-
+		update_sb();
 		if (cur_block_idx >= CFS_NUMBER_OF_BLOCKS - cfs_sb.meta_end_idx)
 		{
 			printf("error writng, cant fit\n");
@@ -452,11 +453,6 @@ int write_file(char* _src, char* _dst_at_cfs)
 		
 	}
 
-
-	if (scr_size < dst_file_meta.content_size) // files becomes smaller
-	{
-		delete_block_list(cur_block_idx);			
-	}
 	
 	update_size_by_meta(&dst_file_meta, scr_size);
 	update_sb();
@@ -475,6 +471,46 @@ int delete_file(char* _dst_at_cfs)
 	if (dst_file_meta.content_size > 0)
 	delete_block_list(dst_file_meta.start_block_idx);
 	return 0;
+}
+
+int read_file(char* _dst, char* _src_at_cfs)
+{
+	cfs_meta src_file_meta;
+	if (find_meta_by_fname(&src_file_meta, _src_at_cfs) == -1) // no such destination
+	{
+		return -1; // err
+	}
+
+
+	FILE* dst_fd = fopen(_dst, "w+b");
+	if (dst_fd == NULL)
+	{
+		return -1;
+	}
+
+	int readble_size = src_file_meta.content_size;
+	cfs_block block_read = { 0 };
+	int start_idx = src_file_meta.start_block_idx;
+	int read_now_size = 0;  
+
+	while (readble_size > 0)
+	{
+		read_block_by_idx(&block_read, start_idx);
+
+		block_read.content[read_now_size - 1] = NULL;
+
+		printf("%s", block_read.content);
+		fprintf(dst_fd, "%s", block_read.content);
+		//fwrite(&(block_read.content), sizeof(char), read_now_size - 1, dst_fd);
+		read_now_size = (readble_size >= CRS_DATA_IN_BLOCK_SIZE) ? CRS_DATA_IN_BLOCK_SIZE : readble_size;
+		readble_size -= read_now_size;
+
+		start_idx = get_block_next_idx(start_idx);
+	}
+
+	printf("\n");
+
+	fclose(dst_fd);
 }
 
 // EOF
