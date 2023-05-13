@@ -30,13 +30,13 @@ typedef struct cfs_super_block_t {
 typedef struct cfs_block_t {
    
     int next_idx;
-    char content[CRS_DATA_IN_BLOCK_SIZE];
+    unsigned char content[CRS_DATA_IN_BLOCK_SIZE];
 
 } cfs_block, * cfs_block_ptr;
 
 typedef struct cfs_meta_t { // 28
 
-    char f_path[CFS_FILE_PATH_LEN];
+    unsigned char f_path[CFS_FILE_PATH_LEN];
 
     int start_block_idx; // if clean = -1
     int content_size; // in bytes

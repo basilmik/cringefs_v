@@ -40,6 +40,11 @@ int get_meta_offset_from_end(int _meta_idx) // 64 (block size) / 8 (meta size) =
 
 
 
+int setpos_to_data_by_idx(int _idx)
+{
+	fseek(cfs_container, _idx * CFS_BLOCK_SIZE + 4, SEEK_SET);
+}
+
 int setpos_to_block_by_idx(int _idx)
 {
 	fseek(cfs_container, _idx * CFS_BLOCK_SIZE, SEEK_SET);
@@ -489,28 +494,47 @@ int read_file(char* _dst, char* _src_at_cfs)
 	}
 
 	int readble_size = src_file_meta.content_size;
-	cfs_block block_read = { 0 };
+	
 	int start_idx = src_file_meta.start_block_idx;
 	int read_now_size = 0;  
+	cfs_block block_read = { 0 };
+	char* buf;
 
 	while (readble_size > 0)
 	{
-		read_block_by_idx(&block_read, start_idx);
-
-		block_read.content[read_now_size - 1] = NULL;
-
-		printf("%s", block_read.content);
-		fprintf(dst_fd, "%s", block_read.content);
-		//fwrite(&(block_read.content), sizeof(char), read_now_size - 1, dst_fd);
 		read_now_size = (readble_size >= CRS_DATA_IN_BLOCK_SIZE) ? CRS_DATA_IN_BLOCK_SIZE : readble_size;
 		readble_size -= read_now_size;
+		setpos_to_data_by_idx(start_idx);
+		buf = calloc(read_now_size + 1, sizeof(char));
+		if (buf == NULL)
+		{
+			fclose(dst_fd);
+			return -1;
+		}
+
+		fread(buf, sizeof(char), read_now_size, cfs_container);
+		buf[read_now_size] = NULL;
+
+		//read_block_by_idx(&block_read, start_idx);
+		
+		//strcpy(buf, &block_read.content);
+
+		/*if (read_now_size != CRS_DATA_IN_BLOCK_SIZE)
+			block_read.content[read_now_size] = NULL;*/
+
+		printf("%s", buf);
+		fprintf(dst_fd, "%s", buf);
+		//fwrite(&(block_read.content), sizeof(char), read_now_size - 1, dst_fd);
+		
 
 		start_idx = get_block_next_idx(start_idx);
+		free(buf);
 	}
 
 	printf("\n");
 
 	fclose(dst_fd);
+	return 0;
 }
 
 // EOF
