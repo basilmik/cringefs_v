@@ -13,22 +13,22 @@
 #define CFS_NUMBER_OF_BLOCKS 10
 
 
-
 int cfs_init(char* _path);
-
 int cfs_shutdown();
-
 int cfs_format(char* _path);
 
 typedef struct cfs_super_block_t {
+    
     int magic;
     int sb_end_idx;
     int meta_end_idx;
     int num_of_meta_rec;
     int first_empty_block;
+
 } cfs_super_block, * cfs_super_block_ptr;
 
 typedef struct cfs_block_t {
+   
     int next_idx;
     char content[CRS_DATA_IN_BLOCK_SIZE];
 
@@ -38,18 +38,11 @@ typedef struct cfs_meta_t { // now takes 8 bytes
 
     char f_path[CFS_FILE_PATH_LEN];
 
-    int start_block_idx;
+    int start_block_idx; // if clean = -1
     int content_size; // in bytes
     int meta_idx;
 
-    //char is_dir;
-    //char cleared;
-
 } cfs_meta, * cfs_meta_ptr;
 
-int add_new_meta();
-
-
-int copy_file_to_cfs(char* _src, char* _dst_at_cfs);
 
 int create_file(char* _name);
