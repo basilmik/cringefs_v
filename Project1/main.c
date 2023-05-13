@@ -7,8 +7,11 @@ int main()
 
 	printf("%d\n", sizeof(cfs_meta));
 	
-//#if REFORMAT
-
+#if REFORMAT
+	cfs_init("container.txt");
+	cfs_shutdown();
+	getch();
+#else
 	cfs_format("container.txt");
 
 
@@ -34,17 +37,27 @@ int main()
 	write_file("test4.txt", "f1");
 	cfs_shutdown();
 	
-
 	getch();
 	cfs_init("container.txt");
-	write_file("test5.txt", "f2");
+	create_file("f4");
+	write_file("test6.txt", "f4");
 	cfs_shutdown();
 
+	/*getch();
+	cfs_init("container.txt");
+	write_file("test5.txt", "f2");
+	cfs_shutdown();*/
+
+	//getch();
+	//cfs_init("container.txt");
+	//cfs_shutdown();
+
+	//getch();
 	//getch();
 
 
 
-//#endif
+#endif
 
 	return 0;
 }

@@ -34,13 +34,14 @@ typedef struct cfs_block_t {
 
 } cfs_block, * cfs_block_ptr;
 
-typedef struct cfs_meta_t { // now takes 8 bytes
+typedef struct cfs_meta_t { // 28
 
     char f_path[CFS_FILE_PATH_LEN];
 
     int start_block_idx; // if clean = -1
     int content_size; // in bytes
     int meta_idx;
+    int fitt;
 
 } cfs_meta, * cfs_meta_ptr;
 
