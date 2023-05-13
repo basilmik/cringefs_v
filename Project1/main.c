@@ -31,18 +31,18 @@ int main()
 
 	getch();
 	cfs_init("container.txt");
-	write_file("test3.txt", "f1");
+	write_file("test4.txt", "f1");
 	cfs_shutdown();
+	
 
 	getch();
 	cfs_init("container.txt");
-	write_file("test3.txt", "f2");
+	write_file("test5.txt", "f2");
 	cfs_shutdown();
 
-	getch();
-	cfs_init("container.txt");
-	write_file("test2.txt", "f1");
-	cfs_shutdown();
+	//getch();
+
+
 
 //#endif
 
