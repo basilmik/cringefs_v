@@ -92,8 +92,9 @@ int get_next_empty()
 			idx++;
 		else
 		{
-			cfs_sb.first_empty_block = idx;
-			return cfs_sb.first_empty_block;
+			//cfs_sb.first_empty_block = idx;
+			//return cfs_sb.first_empty_block;
+			return idx;
 			break;
 		}
 	}
@@ -383,10 +384,9 @@ int write_file(char* _src, char* _dst_at_cfs)
 	int writable_size = scr_size;
 	int wrote_size = 0;
 	int cur_block_idx = dst_file_meta.start_block_idx;
-	//int next_block_idx = get_block_next_idx(cur_block_idx);
-
+	
 	int next_block_idx = 0;
-	//update_first_empty_idx();
+	
 
 	int last_block_idx = cur_block_idx;
 
@@ -402,12 +402,12 @@ int write_file(char* _src, char* _dst_at_cfs)
 	
 	char* buf;
 
-
+	next_block_idx = get_first_empty();
+	
 	while (writable_size > 0)
-	{
-		
-		next_block_idx = get_next_empty();
-		//update_first_empty_idx();
+	{	
+		update_first_empty_idx();
+
 		if (cur_block_idx >= CFS_NUMBER_OF_BLOCKS - cfs_sb.meta_end_idx)
 		{
 			printf("error writng, cant fit\n");
@@ -425,20 +425,9 @@ int write_file(char* _src, char* _dst_at_cfs)
 			exit(-1); // err
 		}
 		
-		//if (scr_size >= dst_file_meta.content_size) // files becomes bigger
-		//{
-		//	if (next_block_idx == -1)
-		//	{
-		//		next_block_idx = get_next_empty();
-		//	}
-		//	if (next_block_idx == 0)
-		//	{
-		//		next_block_idx = get_first_empty();
-		//		update_first_empty_idx();
-		//	}
-		//}
 
 		fread(buf, sizeof(char), read_now_size, src_fd);
+		
 		writable_size -= read_now_size;
 		wrote_size += read_now_size;
 
@@ -447,14 +436,6 @@ int write_file(char* _src, char* _dst_at_cfs)
 		last_block_idx = cur_block_idx;
 		cur_block_idx = get_first_empty();
 		
-		/*update_first_empty_idx();
-		next_block_idx = get_first_empty();*/
-		
-		//next_block_idx = get_block_next_idx(cur_block_idx);
-		
-		
-
-
 		if (cur_block_idx == -1 && scr_size != wrote_size)
 		{
 			printf("no space left\n");
@@ -466,8 +447,8 @@ int write_file(char* _src, char* _dst_at_cfs)
 
 			fclose(src_fd);
 			return -1;
-		}
-		
+		}		
+		next_block_idx = get_next_empty();
 	}
 
 
@@ -476,7 +457,6 @@ int write_file(char* _src, char* _dst_at_cfs)
 		delete_block_list(cur_block_idx);			
 	}
 	
-
 	update_size_by_meta(&dst_file_meta, scr_size);
 	update_sb();
 
