@@ -402,8 +402,8 @@ int write_file(char* _src, char* _dst_at_cfs)
 	
 	char* buf;
 
-	next_block_idx = get_first_empty();
-	
+	next_block_idx = get_next_empty();
+	//update_first_empty_idx();
 	while (writable_size > 0)
 	{	
 		update_first_empty_idx();
@@ -430,7 +430,7 @@ int write_file(char* _src, char* _dst_at_cfs)
 		
 		writable_size -= read_now_size;
 		wrote_size += read_now_size;
-
+		
 		write_block((writable_size == 0 ? &writable_size : &next_block_idx), buf, read_now_size, cur_block_idx);
 		
 		last_block_idx = cur_block_idx;
@@ -449,6 +449,7 @@ int write_file(char* _src, char* _dst_at_cfs)
 			return -1;
 		}		
 		next_block_idx = get_next_empty();
+		
 	}
 
 

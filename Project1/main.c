@@ -1,6 +1,6 @@
 #include "stdio.h"
 #include "cfs.h"
-#define REFORMAT 0
+#define REFORMAT 1
 int main()
 {
 
